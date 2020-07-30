@@ -1,0 +1,61 @@
+`version: '3.5'
+networks:
+rmoff_kafka:
+name: rmoff_kafka
+
+services:
+zookeeper:
+image: confluentinc/cp-zookeeper:latest
+container_name: zookeeper
+networks:
+- rmoff_kafka
+environment:
+ZOOKEEPER_CLIENT_PORT: 2181
+broker:
+image: confluentinc/cp-kafka:latest
+container_name: broker
+ports:
+- "19092:19092"
+networks:
+- rmoff_kafka
+depends_on:
+- zookeeper
+environment:
+KAFKA_BROKER_ID: 1
+KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,CONNECTIONS_FROM_HOST://localhost:19092
+KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONNECTIONS_FROM_HOST:PLAINTEXT
+KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+db:
+image: mysql:latest
+ports:
+- "33060:33060" #I have not used 3306 ports because I don't want to interfere with local mysql process
+container_name: file_loc_db
+depends_on:
+- broker
+networks:
+- rmoff_kafka
+environment:
+MYSQL_USER: 'root'
+MYSQL_ROOT_PASSWORD: root12
+MYSQL_DATABASE: audio
+client:
+image: mysqlkafkamultifileupload:1.0
+restart: always
+container_name: python_client
+depends_on:
+- broker
+- db
+networks:
+- rmoff_kafka
+ports:
+- "5000:5000"
+entrypoint:
+- bash
+- -c
+- |
+echo 'Giving Kafka a bit of time to start up…'
+# while true; do sleep 1000; done
+#sleep 30
+# Run the client code
+python app.py broker:9092
